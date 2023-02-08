@@ -1,0 +1,70 @@
+import logging
+import os
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
+
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+ITEMS = [
+    {
+        'name': 'Microgreens A',
+        'description': 'A pack of delicious microgreens',
+        'price': 10.99
+    },
+    {
+        'name': 'Microgreens B',
+        'description': 'Another pack of delicious microgreens',
+        'price': 12.99
+    },
+    # Add more items here
+]
+
+def start(update, context):
+    reply_keyboard = [[item['name']] for item in ITEMS]
+    update.message.reply_text(
+        'Welcome to the Microgreens Bot! Please select an item:',
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+    )
+
+def item_selected(update, context):
+    selected_item = None
+    for item in ITEMS:
+        if item['name'] == update.message.text:
+            selected_item = item
+            break
+    if selected_item:
+        reply_keyboard = [['Order'], ['Cancel']]
+        update.message.reply_text(
+            f'You selected {selected_item["name"]} - {selected_item["description"]}. Price: {selected_item["price"]}. Order?',
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True)
+        )
+    else:
+        update.message.reply_text('Item not found. Please select an item from the list.')
+
+def order(update, context):
+    update.message.reply_text('Order confirmed! Delivery will be arranged.')
+
+def cancel(update, context):
+    update.message.reply_text('Order cancelled.')
+
+def error(update, context):
+    logger.warning('Update "%s" caused error "%s"', update, context.error)
+
+def main():
+    token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not token:
+        raise Exception('TELEGRAM_BOT_TOKEN environment variable is not set.')
+
+    updater = Updater(token, use_context=True)
+
+    dp = updater.dispatcher
+
+    dp.add_handler(CommandHandler('start', start))
+    dp.add_handler(MessageHandler(Filters.text, item_selected))
+    dp.add_handler(MessageHandler(Filters.regex('^Order$'), order))
+    dp.add_handler(MessageHandler(Filters.regex('^Cancel$'), cancel))
+    dp.add_error_handler(error)
+
+    updater.start_polling()
+    updater.idle()
